@@ -1,17 +1,10 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Dec 14 17:31:20 2021
-
-@author: Frank
-"""
 import sys
 import os
 import gensim.downloader
 from gensim.models import Word2Vec
 from PyQt5 import QtWidgets, uic
 from PyQt5.QtGui import QTextCursor
-from transformers import AutoTokenizer
-from transformers import AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM
 
 
 class MainWindow(QtWidgets.QDialog):
@@ -19,9 +12,13 @@ class MainWindow(QtWidgets.QDialog):
     buttonList = []
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__()
+        # GUI stuff
         uic.loadUi("Schreibhilfe_MainWindow.ui", self)
         self.buttonSynonyms.clicked.connect(self.findSynonyms)
-        self.buttonTranslation.clicked.connect(self.translate)        
+        self.buttonTranslation.clicked.connect(self.translate) 
+        self.buttonSettings.clicked.connect(self.openSettings)
+        self.buttonSuggestWord.clicked.connect(self.suggestNextWord)
+        self.buttonGenerateText.clicked.connect(self.generateText)
         self.textProcessing = Textprocessing()
         self.buttonList.append(self.buttonOption1)
         self.buttonList.append(self.buttonOption2)
@@ -43,8 +40,6 @@ class MainWindow(QtWidgets.QDialog):
         self.buttonOption8.clicked.connect(lambda: self.commitText(self.buttonOption8.text()))
         self.buttonOption9.clicked.connect(lambda: self.commitText(self.buttonOption9.text()))
         self.buttonOption10.clicked.connect(lambda: self.commitText(self.buttonOption10.text()))
-            
-    # TODO: implement a 'generate' button, to let the gpt-2 model generate some text    
         
     def translate(self):  
         text = self.textGerman.toPlainText()
@@ -80,17 +75,35 @@ class MainWindow(QtWidgets.QDialog):
         resultList = self.textProcessing.getMostSimilar(text)
         for index in range(len(resultList)):
             self.buttonList[index].setText(resultList[index][0])
-        
+            
+    def suggestNextWord(self):
+        suggestedWords = self.textProcessing.generateText(self.textEnglish.toPlainText(), 1)
+        for index, word in enumerate(suggestedWords):
+            self.buttonList[index].setText(word)
+        pass
+    
+    def generateText(self):
+        generatedText = self.textProcessing.generateText(self.textEnglish.toPlainText(), 50)
+        self.textGerman.setText(generatedText[0])
+        pass
+                    
     def commitText(self, text=""):
         # insert text at cursor position (if something is highlighted it will be overwritten) 
         cursor = self.textEnglish.textCursor()
         cursor.insertText(text)
+        
+    def openSettings(self):
+        # TODO
+        print("Not implemented yet!")
+        pass
    
         
 class Textprocessing():
     wordVector = None
     translationTokenizer = None
     translationModel = None
+    generationModel = None
+    generationTokenizer = None
     def __init__(self):
         # if a local word2vec file exist load the model, else use the gensim downloader to get a pretrained
         if os.path.isfile("models/word2vec_model"):
@@ -104,6 +117,13 @@ class Textprocessing():
         else:
             self.translationTokenizer = AutoTokenizer.from_pretrained("models/translation")
             self.translationModel = AutoModelForSeq2SeqLM.from_pretrained("models/translation")
+        # check for text generation model
+        if len(os.listdir("models/textgeneration")) == 0:
+            self.generationTokenizer = AutoTokenizer.from_pretrained("gpt2")
+            self.generationModel = AutoModelForCausalLM.from_pretrained("gpt2")
+        else:            
+            self.generationTokenizer = AutoTokenizer.from_pretrained("models/textgeneration")
+            self.generationModel = AutoModelForCausalLM.from_pretrained("models/textgeneration")
         pass
     
     def loadModels():
@@ -113,13 +133,42 @@ class Textprocessing():
         sims = self.wordVector.most_similar(inputText.lower(), topn=n)
         return sims
     
-    def getTranslation(self, inputText: str, n=10) -> str:
+    def getTranslation(self, inputText: str, n=10):
         encoder_input_str = inputText
         encoder_input_ids = self.translationTokenizer(encoder_input_str, return_tensors="pt").input_ids
         outputs = self.translationModel.generate(encoder_input_ids, num_beams=n, num_return_sequences=n)
         result = []
         for output in outputs:
             result.append(self.translationTokenizer.decode(output, skip_special_tokens=True))
+        return result
+    
+    def generateText(self, inputText: str, length: int):
+        inputs = self.generationTokenizer(inputText, return_tensors="pt")
+        input_ids = inputs["input_ids"]
+        if length == 1:
+            outputs = self.generationModel.generate(
+                input_ids, 
+                max_new_tokens=1,
+                num_beams=10, 
+                num_return_sequences=10,
+                max_length = 500
+            )
+        else:
+            outputs = self.generationModel.generate(
+                input_ids, 
+                do_sample=True, 
+                max_length=length, 
+                top_k=50, 
+                temperature=0.8, 
+                num_beams=5, 
+                num_return_sequences=1,
+                early_stopping=True
+            )
+        result = []
+        for output in outputs:
+            text = self.generationTokenizer.decode(output, skip_special_tokens=True)
+            # TODO: find a smoother solution to remove the inputText
+            result.append(text.replace(inputText, ""))
         return result
 
 

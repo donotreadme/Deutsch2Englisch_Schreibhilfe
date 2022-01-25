@@ -39,7 +39,7 @@
     <string>Insert your German text for translation</string>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>960</x>
@@ -57,22 +57,36 @@
      </widget>
     </item>
     <item>
-     <widget class="QPushButton" name="buttonSettings">
-      <property name="text">
-       <string>Settings</string>
-      </property>
-     </widget>
-    </item>
-    <item>
      <widget class="QPushButton" name="buttonTranslation">
       <property name="text">
        <string>Show Translation</string>
       </property>
      </widget>
     </item>
+    <item>
+     <widget class="QPushButton" name="buttonSuggestWord">
+      <property name="text">
+       <string>Suggest Next Word</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="buttonGenerateText">
+      <property name="text">
+       <string>Generate Text</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="buttonSettings">
+      <property name="text">
+       <string>Settings</string>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>50</x>
