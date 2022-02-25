@@ -12,6 +12,8 @@ class MainWindow(QtWidgets.QDialog):
     textProcessing = None
     buttonList = []
     languageTool = language_tool_python.LanguageTool('en-US')
+    spellErrorMatches = []
+    need_to_reload_spellcheck = False
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__()
         # GUI stuff
@@ -101,6 +103,8 @@ class MainWindow(QtWidgets.QDialog):
         matches = self.languageTool.check(self.textEnglish.toPlainText())
         redColor = QColor(255, 0, 0)
         cursor = self.textEnglish.textCursor()
+        # keep matches for later use
+        self.spellErrorMatches = matches
         # iterate through all matches and set color from text in question to red
         for match in matches:
             cursor.setPosition(match.offset, QTextCursor.MoveAnchor)
@@ -111,6 +115,24 @@ class MainWindow(QtWidgets.QDialog):
             cursor.insertText(text)
         # TODO: show suggestions for found spell errors
         pass
+    
+    def correctSpellError(self):
+        cursor = self.textEnglish.textCursor()
+        positionCursor = cursor.position()
+        # iterate through all errors and check if the cursor is at the position of a error
+        for match in self.spellErrorMatches:
+            if positionCursor >= match.offset and positionCursor <= match.offset+match.errorLength:
+                cursor.setPosition(match.offset)
+                # highlight the error
+                cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, n = match.errorLength)
+                self.textEnglish.setTextCursor(cursor)
+                # write suggestions into commitButtons
+                for index, replacement in enumerate(match.replacements):
+                    self.buttonList[index].setText(replacement)
+                self.textGerman.setText(match.message)
+                # after commiting a change the positions are probably no longer correct, so reload spellcheck in the commitText function
+                self.need_to_reload_spellcheck = True
+        pass
                     
     def commitText(self, text=""):
         # insert text at cursor position (if something is highlighted it will be overwritten) 
@@ -118,10 +140,18 @@ class MainWindow(QtWidgets.QDialog):
         self.textEnglish.setTextColor(blackColor)
         cursor = self.textEnglish.textCursor()        
         cursor.insertText(text)
+        # clean up button text after insertion
+        for button in self.buttonList:
+            button.setText("default")
+        # reload spellcheck to avoid unexpected behavior 
+        if self.need_to_reload_spellcheck:
+            self.spellcheck()
         
     def openSettings(self):
         # TODO
         print("Not implemented yet!")
+        # TODO: just a temporary solution till GUI is rearranged
+        self.correctSpellError()
         pass
    
         
