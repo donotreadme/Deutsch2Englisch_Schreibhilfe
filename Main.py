@@ -3,13 +3,15 @@ import os
 import gensim.downloader
 from gensim.models import Word2Vec
 from PyQt5 import QtWidgets, uic
-from PyQt5.QtGui import QTextCursor
+from PyQt5.QtGui import QTextCursor, QColor
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM
+import language_tool_python
 
 
 class MainWindow(QtWidgets.QDialog):
-    textProcessing = Word2Vec()
+    textProcessing = None
     buttonList = []
+    languageTool = language_tool_python.LanguageTool('en-US')
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__()
         # GUI stuff
@@ -19,6 +21,7 @@ class MainWindow(QtWidgets.QDialog):
         self.buttonSettings.clicked.connect(self.openSettings)
         self.buttonSuggestWord.clicked.connect(self.suggestNextWord)
         self.buttonGenerateText.clicked.connect(self.generateText)
+        self.buttonSpellCheck.clicked.connect(self.spellcheck)
         self.textProcessing = Textprocessing()
         self.buttonList.append(self.buttonOption1)
         self.buttonList.append(self.buttonOption2)
@@ -40,6 +43,7 @@ class MainWindow(QtWidgets.QDialog):
         self.buttonOption8.clicked.connect(lambda: self.commitText(self.buttonOption8.text()))
         self.buttonOption9.clicked.connect(lambda: self.commitText(self.buttonOption9.text()))
         self.buttonOption10.clicked.connect(lambda: self.commitText(self.buttonOption10.text()))
+        
         
     def translate(self):  
         text = self.textGerman.toPlainText()
@@ -86,10 +90,33 @@ class MainWindow(QtWidgets.QDialog):
         generatedText = self.textProcessing.generateText(self.textEnglish.toPlainText(), 50)
         self.textGerman.setText(generatedText[0])
         pass
+    
+    def spellcheck(self):
+        # remove all red color from former spellchecks
+        blackColor = QColor(0, 0, 0)
+        text = self.textEnglish.toPlainText()
+        self.textEnglish.setTextColor(blackColor)
+        self.textEnglish.setText(text)
+        # check for spelling error and save them in 'matches'
+        matches = self.languageTool.check(self.textEnglish.toPlainText())
+        redColor = QColor(255, 0, 0)
+        cursor = self.textEnglish.textCursor()
+        # iterate through all matches and set color from text in question to red
+        for match in matches:
+            cursor.setPosition(match.offset, QTextCursor.MoveAnchor)
+            cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor, match.errorLength)
+            text = cursor.selectedText()
+            self.textEnglish.setTextCursor(cursor)
+            self.textEnglish.setTextColor(redColor)
+            cursor.insertText(text)
+        # TODO: show suggestions for found spell errors
+        pass
                     
     def commitText(self, text=""):
         # insert text at cursor position (if something is highlighted it will be overwritten) 
-        cursor = self.textEnglish.textCursor()
+        blackColor = QColor(0, 0, 0)
+        self.textEnglish.setTextColor(blackColor)
+        cursor = self.textEnglish.textCursor()        
         cursor.insertText(text)
         
     def openSettings(self):
@@ -108,23 +135,29 @@ class Textprocessing():
         # if a local word2vec file exist load the model, else use the gensim downloader to get a pretrained
         if os.path.isfile("models/word2vec_model"):
             self.wordVector = Word2Vec.load("models/word2vec_model").wv
+            print("loaded custom word2vec model")
         else:
             self.wordVector = gensim.downloader.load('glove-wiki-gigaword-50')
+            print("loaded glove-wiki-gigaword")
         # if the translation folder is empty load one through the transformers pipeline, else use the local model
         if len(os.listdir("models/translation")) == 0:
             self.translationTokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-de-en")
             self.translationModel = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-de-en")
+            print("loaded default translation model")
         else:
             self.translationTokenizer = AutoTokenizer.from_pretrained("models/translation")
             self.translationModel = AutoModelForSeq2SeqLM.from_pretrained("models/translation")
-        # check for text generation model
+            print("loaded custom translation model")
+        # use default gpt2-small model, if there is no other text generation model 
         if len(os.listdir("models/textgeneration")) == 0:
             self.generationTokenizer = AutoTokenizer.from_pretrained("gpt2")
             self.generationModel = AutoModelForCausalLM.from_pretrained("gpt2")
+            print("loaded gpt2")
         else:            
             self.generationTokenizer = AutoTokenizer.from_pretrained("models/textgeneration")
             self.generationModel = AutoModelForCausalLM.from_pretrained("models/textgeneration")
-        pass
+            print("loaded custom causal language model")
+        # TODO: exception handling? Who needs exception handling?!
     
     def loadModels():
         pass

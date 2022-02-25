@@ -78,6 +78,13 @@
      </widget>
     </item>
     <item>
+     <widget class="QPushButton" name="buttonSpellCheck">
+      <property name="text">
+       <string>Spell Check</string>
+      </property>
+     </widget>
+    </item>
+    <item>
      <widget class="QPushButton" name="buttonSettings">
       <property name="text">
        <string>Settings</string>
